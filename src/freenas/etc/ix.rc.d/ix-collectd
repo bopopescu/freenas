@@ -1,0 +1,273 @@
+#!/bin/sh
+#
+# $FreeBSD$
+#
+
+# PROVIDE: ix-collectd
+# REQUIRE: var
+# BEFORE: collectd
+
+. /etc/rc.freenas
+
+
+use_rrd_dataset()
+{
+	local use
+
+	if [ -z "$(get_rrd_dataset)" ]
+	then
+		return 1
+	fi
+
+	use="$(${FREENAS_SQLITE_CMD} ${RO_FREENAS_CONFIG} "
+	SELECT
+		sys_rrd_usedataset
+	FROM
+		system_systemdataset
+	ORDER BY
+		-id
+	LIMIT 1
+	" | \
+	while read -r rrd_usedataset
+	do
+		if [ "${rrd_usedataset}" = "0" ]
+		then
+			echo "1"
+		else
+			if [ "$(/usr/local/bin/midclt call system.is_freenas)" = "False" ]; then
+				local failover="$(/usr/local/bin/midclt -q call notifier.failover_status 2> /dev/null)"
+				if [ "x${failover}" = "xBACKUP" ]; then
+					echo "1"
+				else
+					echo "0"
+				fi
+			else
+				echo "0"
+			fi
+		fi
+	done
+	)"
+
+	return ${use}
+}
+
+
+get_rrd_dataset()
+{
+	local sys_uuid_field
+	if [ "$(ha_node)" = "B" ]; then
+		sys_uuid_field="sys_uuid_b"
+	else
+		sys_uuid_field="sys_uuid"
+	fi
+	if system_dataset_enabled
+	then
+		echo "$(realpath ${FREENAS_SYSTEMDATASET}/rrd-$(${FREENAS_SQLITE_CMD} ${RO_FREENAS_CONFIG} "select ${sys_uuid_field} from system_systemdataset"))"
+	fi
+}
+
+generate_collectd()
+{
+    local datadir
+    local rrdmnt
+    local hostname
+    local graphite
+
+    RO_FREENAS_CONFIG=$(ro_sqlite ${name} 2> /tmp/${name}.fail && rm /tmp/${name}.fail)
+    trap 'rm -f ${RO_FREENAS_CONFIG}' EXIT
+
+    # If there is a failover table remove the rc.conf cache
+    # rc.conf.local will run again using the correct collectd_enable
+    # See #5019
+    local failover="$(${FREENAS_SQLITE_CMD} ${RO_FREENAS_CONFIG} "select count(*) from failover_failover" 2> /dev/null)"
+    if [ -n "${failover}" ] && [ ${failover} -gt 0 ]; then
+	rm ${FREENAS_CONFIG_MD5}
+    fi
+
+    local hostname=$(hostname)
+    local graphite="$(${FREENAS_SQLITE_CMD} ${RO_FREENAS_CONFIG} "select adv_graphite from system_advanced")"
+
+    rrdfile="/data/rrd_dir.tar.bz2"
+    basedir="/var/db/collectd"
+    datadir="/var/db/collectd/rrd"
+    rrdmnt="$(get_rrd_dataset)"
+
+    if use_rrd_dataset && [ -d "${rrdmnt}" ]; then
+	if [ -d "${datadir}" -a ! -L "${datadir}" ]; then
+		mv "${datadir}" "${datadir}.$(date +'%Y%m%d%H%M%S')"
+	fi
+	if [ "$(realpath -q ${datadir})" != "${rrdmnt}" ]; then
+		rm -f "${datadir}"
+		ln -s "${rrdmnt}" "${datadir}"
+	fi
+    else
+        if [ -L "${datadir}" ]; then
+	    rm -f "${datadir}"
+	    mkdir -p "${datadir}"
+	fi
+    fi
+
+    if [ -f "${rrdfile}" ]; then
+        if use_rrd_dataset && [ -d "${rrdmnt}" ]; then
+            if tar -tf "${rrdfile}"|egrep -q '^collectd/rrd/$'; then
+                cd "${rrdmnt}"
+                tar -jxf "${rrdfile}"
+                mv collectd/rrd/* "${rrdmnt}/"
+                mv "${rrdfile}" "${rrdmnt}/"
+                rm -rf collectd
+            fi
+        elif [ -d "/var/db" -a ! -d "${datadir}" ]; then
+            (cd /var/db && tar jxf "${rrdfile}")
+        fi
+    fi
+
+    if use_rrd_dataset; then
+        cd "${rrdmnt}"
+    else
+        mkdir -p ${datadir}/localhost
+        cd ${datadir}
+    fi
+    # Find and remove any stale symlinks to the localhost directory
+    # This can happen when the hostname is changed.
+    # Note: This cannot be done while collectd is running or collectd will
+    # notice it's working directory is missing and create it.
+    # At boot time this script runs before collectd is started.
+    # At run time when this script is run collectd is stopped first.
+    find . -maxdepth 1 -type d \! -name localhost -a \! -name . -a \! -name "$(hostname)" -exec rm -rf '{}' \;
+    for i in $(find . -maxdepth 1 -type l | sed 's|^\./||')
+    do
+	    if [ "${i}" != "$(hostname)" ]; then
+		    rm "${i}"
+	    fi
+    done
+    # If there isn't a symlink localhost -> hostname make it.
+    if ! [ -L "${hostname}" ] && [ "localhost" != "${hostname}" ]; then
+            if [ -e "localhost" ]; then
+                    rm -rf localhost
+            fi
+	    ln -s "${hostname}" localhost
+    fi
+    cfg="/usr/local/etc/collectd.conf"
+    cat << EOF > $cfg
+Hostname "${hostname}"
+FQDNLookup true
+BaseDir "${basedir}"
+PIDFile "/var/run/collectd.pid"
+PluginDir "/usr/local/lib/collectd"
+
+LoadPlugin aggregation
+LoadPlugin cpu
+LoadPlugin cputemp
+LoadPlugin ctl
+LoadPlugin df
+LoadPlugin disk
+LoadPlugin exec
+LoadPlugin geom_stat
+LoadPlugin interface
+LoadPlugin load
+LoadPlugin memory
+LoadPlugin network
+LoadPlugin processes
+LoadPlugin rrdtool
+LoadPlugin swap
+LoadPlugin uptime
+LoadPlugin syslog
+LoadPlugin threshold
+LoadPlugin zfs_arc
+LoadPlugin zfs_arc_v2
+
+<Plugin "syslog">
+    LogLevel err
+</Plugin>
+
+<Plugin "aggregation">
+    <Aggregation>
+        Plugin "cpu"
+        Type "cpu"
+        GroupBy "Host"
+        GroupBy "TypeInstance"
+        CalculateSum true
+    </Aggregation>
+</Plugin>
+<Plugin cputemp>
+</Plugin>
+
+<Plugin "disk">
+    Disk "/^gptid/"
+    Disk "/^md/"
+    Disk "/^pass/"
+    IgnoreSelected true
+</Plugin>
+
+<Plugin "exec">
+    NotificationExec "nobody" "/usr/local/www/freenasUI/tools/collectd_alert.py"
+</Plugin>
+
+<Plugin "interface">
+    Interface "lo0"
+    Interface "ipfw0"
+    Interface "pflog0"
+    Interface "pfsync0"
+    Interface "plip0"
+    Interface "/^usbus/"
+    IgnoreSelected true
+</Plugin>
+
+<Plugin "rrdtool">
+    DataDir "${datadir}"
+    CacheTimeout 120
+    CacheFlush 900
+</Plugin>
+
+<Plugin "threshold">
+  <Plugin "ctl">
+    Instance "ha"
+    <Type "disk_octets">
+      WarningMax 10000000
+      Persist true
+      Interesting false
+    </Type>
+  </Plugin>
+</Plugin>
+
+<Plugin "zfs_arc">
+</Plugin>
+
+<Plugin "geom_stat">
+	Filter "^([a]?da|ciss|md|mfi|md|nvd|xbd|vtbd)[0123456789]+(p[0123456789]+)?(\.eli)?$"
+</Plugin>
+
+<Plugin "df">
+    Mountpoint "/"
+    Mountpoint "/^\/mnt\//"
+    FSType "zfs"
+</Plugin>
+EOF
+
+if [ -n "${graphite}" ]; then
+    cat << EOF >> $cfg
+LoadPlugin write_graphite
+<Plugin "write_graphite">
+  <Node "graphite">
+    Host "${graphite}"
+    Port "2003"
+    Protocol "tcp"
+    LogSendErrors true
+    Prefix "servers."
+    Postfix ""
+    StoreRates true
+    AlwaysAppendDS false
+    EscapeCharacter "_"
+  </Node>
+</Plugin>
+EOF
+fi
+
+}
+
+name="ix-collectd"
+start_cmd='generate_collectd'
+stop_cmd=':'
+
+load_rc_config $name
+run_rc_command "$1"

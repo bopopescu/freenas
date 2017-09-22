@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# $FreeBSD$
+#
+
+# PROVIDE: ix-syncdisks
+# REQUIRE: FILESYSTEMS
+
+. /etc/rc.subr
+
+syncdisks()
+{
+	touch /tmp/.sync_disk_done
+	/usr/local/bin/midclt call disk.sync_all > /dev/null
+	/usr/local/bin/midclt call disk.multipath_sync > /dev/null
+	if [ "$(/usr/local/bin/midclt call system.is_freenas)" = "False" ]; then
+		checkyesno failover_enable || /usr/local/bin/midclt call notifier.zpool_enclosure_sync 2> /dev/null
+	fi
+}
+
+name="ix-syncdisks"
+start_cmd='syncdisks'
+stop_cmd=''
+
+load_rc_config $name
+run_rc_command "$1"

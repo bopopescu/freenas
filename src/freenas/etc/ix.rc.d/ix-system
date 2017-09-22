@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# $FreeBSD$
+#
+
+# PROVIDE: ix-system
+# BEFORE: samba_server ix-syslogd ix-collectd
+
+. /etc/rc.freenas
+
+notifier()
+{
+	/usr/local/bin/midclt call notifier.$1
+}
+
+system_start()
+{
+	notifier system_dataset_create > /dev/null
+	if [ "$(notifier pwenc_check)" = "False" ]; then
+		notifier pwenc_generate_secret
+	fi
+}
+
+name="ix-system"
+start_cmd='system_start'
+stop_cmd=':'
+status_cmd=':'
+
+load_rc_config $name
+run_rc_command $*
