@@ -126,8 +126,8 @@ class CIFS(Model):
         verbose_name=_("Use syslog only"),
         default=False,
     )
-    cifs_srv_localmaster = models.BooleanField(
-        verbose_name=_("Local Master"),
+    cifs_srv_localmain = models.BooleanField(
+        verbose_name=_("Local Main"),
         default=False,
     )
     cifs_srv_domain_logons = models.BooleanField(
@@ -1254,11 +1254,11 @@ class SNMP(Model):
 
 class UPS(Model):
     ups_mode = models.CharField(
-        default='master',
+        default='main',
         max_length=6,
         choices=(
-            ('master', _("Master")),
-            ('slave', _("Slave")),
+            ('main', _("Main")),
+            ('subordinate', _("Subordinate")),
         ),
         verbose_name=_("UPS Mode"),
     )

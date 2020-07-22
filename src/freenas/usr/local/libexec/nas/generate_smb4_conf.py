@@ -785,9 +785,9 @@ def add_activedirectory_conf(client, smb4_conf):
     confset1(smb4_conf, "security = ADS")
     confset1(smb4_conf, "client use spnego = yes")
 
-    confset1(smb4_conf, "local master = no")
-    confset1(smb4_conf, "domain master = no")
-    confset1(smb4_conf, "preferred master = no")
+    confset1(smb4_conf, "local main = no")
+    confset1(smb4_conf, "domain main = no")
+    confset1(smb4_conf, "preferred main = no")
 
     confset2(smb4_conf, "ads dns update = %s",
              "yes" if ad.ad_allow_dns_updates else "no")
@@ -1027,8 +1027,8 @@ def generate_smb4_conf(client, smb4_conf, role):
                  "yes" if cifs.domain_logons else "no")
 
     if not client.call('notifier.common', 'system', 'activedirectory_enabled'):
-        confset2(smb4_conf, "local master = %s",
-                 "yes" if cifs.localmaster else "no")
+        confset2(smb4_conf, "local main = %s",
+                 "yes" if cifs.localmain else "no")
 
     if not smb4_autorid_enabled(client):
         # 5 = DS_TYPE_CIFS

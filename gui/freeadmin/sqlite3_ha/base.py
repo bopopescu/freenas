@@ -26,7 +26,7 @@ whole table.
 """
 NO_SYNC_MAP = {
     'system_failover': {
-        'fields': ['master'],
+        'fields': ['main'],
     },
 }
 
@@ -151,7 +151,7 @@ class DatabaseWrapper(sqlite3base.DatabaseWrapper):
         excluding the tables that should not be synced between nodes.
         """
         cur = self.cursor()
-        cur.executelocal("select name from sqlite_master where type = 'table'")
+        cur.executelocal("select name from sqlite_main where type = 'table'")
 
         script = []
         for row in cur.fetchall():
@@ -185,7 +185,7 @@ class DatabaseWrapper(sqlite3base.DatabaseWrapper):
         """
 
         cur = self.cursor()
-        cur.executelocal("select name from sqlite_master where type = 'table'")
+        cur.executelocal("select name from sqlite_main where type = 'table'")
 
         for row in cur.fetchall():
             table = row[0]

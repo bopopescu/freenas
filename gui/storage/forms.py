@@ -2804,7 +2804,7 @@ class UnlockPassphraseForm(Form):
                     c.call('failover.call_remote', 'failover.encryption_setkey', [passphrase])
             except:
                 log.warn('Failed to set key on standby node, is it down?', exc_info=True)
-            _notifier.failover_force_master()
+            _notifier.failover_force_main()
 
 
 class KeyForm(Form):

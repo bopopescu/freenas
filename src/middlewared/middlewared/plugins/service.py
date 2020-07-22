@@ -696,7 +696,7 @@ class ServiceService(CRUDService):
 
     async def _started_ups(self, **kwargs):
         mode = (await self.middleware.call('datastore.query', 'services.ups', [], {'order_by': ['-id'], 'get': True}))['ups_mode']
-        if mode == "master":
+        if mode == "main":
             svc = "ups"
         else:
             svc = "upsmon"

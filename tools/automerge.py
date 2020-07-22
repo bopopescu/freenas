@@ -20,17 +20,17 @@ Examples of commit messages:
     Merge:  stable-1.0
     -----------------------
 
-    --- Merge the commit to repo ix (master and stable-1.1 branches ---
+    --- Merge the commit to repo ix (main and stable-1.1 branches ---
     --- and local branch "stable-1.0"                               ---
     Commit 2
 
-    Merge:  ix[master stable-1.1] stable-1.0
+    Merge:  ix[main stable-1.1] stable-1.0
     -----------------------
 
     --- Prevent commit from being merge to repo ix                  ---
     Commit 2
 
-    Merge:  ix[master stable-1.1] stable-1.0
+    Merge:  ix[main stable-1.1] stable-1.0
     -----------------------
 
 
@@ -95,14 +95,14 @@ class Merge(object):
                     found = True
                     break
             if not found:
-                repos.append((default, 'master'))
+                repos.append((default, 'main'))
 
         failed = []
         for name, branches in repos:
             if name not in ext_repos and branches:
                 raise ValueError("Invalid repo name: %s" % name)
             if name in ext_repos and not branches:
-                branches = 'master'
+                branches = 'main'
             if name and not branches:
                 try:
                     self._do_merge(repo, "origin", name)
@@ -145,7 +145,7 @@ class Merge(object):
         branches = RE_BRANCH.findall(branches)
         if not branches:
             #TODO: configurable default merge branch
-            branches.append("%s/master" % name)
+            branches.append("%s/main" % name)
 
         failed = []
         for branch in branches:
@@ -168,11 +168,11 @@ class Merge(object):
         # For some reason git reset --hard hungs
         # Workaround it checking out to another branch first
         #repo.checkout(
-        #    refname="refs/remotes/origin/master",
+        #    refname="refs/remotes/origin/main",
         #    strategy=pygit2.GIT_CHECKOUT_FORCE,
         #)
         #FIXME: For some reason repo.checkout doesnt work the same way
-        self._git_run("git checkout -f origin/master")
+        self._git_run("git checkout -f origin/main")
 
         try:
             repo.checkout(
@@ -323,11 +323,11 @@ def main():
     if args.revs:
         if len(args.revs) == 1:
             args.revs = (None, ) + args.revs
-        fetch = [args.revs + ("origin/master", )]
+        fetch = [args.revs + ("origin/main", )]
     else:
         fetch = RE_FETCH.findall(stderr)
     for oldrev, newrev, ref in fetch:
-        if ref != "origin/master":
+        if ref != "origin/main":
             continue
         newcommit = repo[newrev]
         commits = []

@@ -427,10 +427,10 @@ class ShellWorkerThread(threading.Thread):
 
     def run(self):
 
-        self.shell_pid, master_fd = os.forkpty()
+        self.shell_pid, main_fd = os.forkpty()
         if self.shell_pid == 0:
             for i in range(3, 1024):
-                if i == master_fd:
+                if i == main_fd:
                     continue
                 try:
                     os.close(i)
@@ -450,7 +450,7 @@ class ShellWorkerThread(threading.Thread):
             and forwarding it to the websocket.
             """
             while True:
-                read = os.read(master_fd, 1024)
+                read = os.read(main_fd, 1024)
                 if read == b'':
                     break
                 self.ws.send_str(read.decode('utf8'))
@@ -463,7 +463,7 @@ class ShellWorkerThread(threading.Thread):
             while True:
                 try:
                     get = self.input_queue.get(timeout=1)
-                    os.write(master_fd, get)
+                    os.write(main_fd, get)
                 except queue.Empty:
                     # If we timeout waiting in input query lets make sure
                     # the shell process is still alive

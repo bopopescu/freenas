@@ -966,7 +966,7 @@ def volume_lock(request, object_id):
                 escrowctl = LocalEscrowCtl()
                 escrowctl.clear()
                 try:
-                    os.unlink('/tmp/.failover_master')
+                    os.unlink('/tmp/.failover_main')
                 except:
                     pass
         notifier().restart("system_datasets")

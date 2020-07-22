@@ -698,7 +698,7 @@ def reboot_run(request):
     # See #19458
     # IMPORTANT: do not sync this change stopping the nginx service if
     # we are running on a TrueNAS HA system since that stops the nginx
-    # on the soon-to-be master node too! see #20384
+    # on the soon-to-be main node too! see #20384
     _n = notifier()
     if not _n.is_freenas() and _n.failover_licensed():
         _n.stop("nginx", sync=False)

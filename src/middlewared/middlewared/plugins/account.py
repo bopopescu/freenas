@@ -389,7 +389,7 @@ class UserService(CRUDService):
     async def __set_smbpasswd(self, username, password):
         """
         Currently the way we set samba passwords is using smbpasswd
-        and that can only happen after the user exists in master.passwd.
+        and that can only happen after the user exists in main.passwd.
         That is the reason we have two methods/steps to set password.
         """
         if not password:

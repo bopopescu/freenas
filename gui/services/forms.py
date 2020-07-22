@@ -157,8 +157,8 @@ class CIFSForm(ModelForm):
             self.fields['cifs_srv_bindip'].initial = ('')
 
         if activedirectory_enabled():
-            self.initial['cifs_srv_localmaster'] = False
-            self.fields['cifs_srv_localmaster'].widget.attrs['disabled'] = 'disabled'
+            self.initial['cifs_srv_localmain'] = False
+            self.fields['cifs_srv_localmain'].widget.attrs['disabled'] = 'disabled'
             self.initial['cifs_srv_timeserver'] = False
             self.fields['cifs_srv_timeserver'].widget.attrs['disabled'] = 'disabled'
             self.initial['cifs_srv_domain_logons'] = False
@@ -940,7 +940,7 @@ class UPSForm(ModelForm):
 
     def clean_ups_port(self):
         port = self.cleaned_data.get("ups_port")
-        if self.cleaned_data.get("ups_mode") == 'master' and not port:
+        if self.cleaned_data.get("ups_mode") == 'main' and not port:
             raise forms.ValidationError(
                 _("This field is required")
             )
@@ -948,7 +948,7 @@ class UPSForm(ModelForm):
 
     def clean_ups_remotehost(self):
         rhost = self.cleaned_data.get("ups_remotehost")
-        if self.cleaned_data.get("ups_mode") != 'master':
+        if self.cleaned_data.get("ups_mode") != 'main':
             if not rhost:
                 raise forms.ValidationError(
                     _("This field is required")
